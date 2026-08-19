@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -17,45 +18,71 @@ public class IdempotencyService {
     private final Map<String, IdempotencyRecord> cache = new ConcurrentHashMap<>();
 
     public ResponseEntity<String> process(String idempotencyKey, PaymentRequest request) {
-        IdempotencyRecord existingRecord = cache.get(idempotencyKey);
+        IdempotencyRecord newRecord = IdempotencyRecord.builder()
+                .status(IdempotencyRecord.Status.IN_FLIGHT)
+                .requestPayload(request)
+                .build();
 
-        if (existingRecord != null && existingRecord.getStatus() == IdempotencyRecord.Status.COMPLETED) {
-            // Check if payload matches
+        // if another thread already put a record here, we get it back.
+        IdempotencyRecord existingRecord = cache.putIfAbsent(idempotencyKey, newRecord);
+
+        if (existingRecord != null) {
+            // Key already exists
             if (!isPayloadMatching(existingRecord.getRequestPayload(), request)) {
                 return ResponseEntity
                         .status(HttpStatus.UNPROCESSABLE_CONTENT)
                         .body("Idempotency key already used for a different request body.");
             }
 
-            // Duplicate request with matching payload
-            HttpHeaders headers = new HttpHeaders();
-            headers.putAll(existingRecord.getResponse().getHeaders());
-            headers.add("X-Cache-Hit", "true");
+            if (existingRecord.getStatus() == IdempotencyRecord.Status.IN_FLIGHT) {
+                // Request is currently processing in another thread
+                try {
+                    ResponseEntity<String> completedResponse = existingRecord.getCompletionFuture().join();
+                    return attachCacheHitHeader(completedResponse);
+                } catch (Exception e) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Concurrent execution failed.");
+                }
+            }
 
-            return new ResponseEntity<String>(
-                    existingRecord.getResponse().getBody(),
-                    headers,
-                    existingRecord.getResponse().getStatusCode()
-            );
+            // Already completed - return cached response
+            return attachCacheHitHeader(existingRecord.getResponse());
         }
 
-        // First-time request
-        ResponseEntity<String> response = ResponseEntity.ok("Charged " + request.getAmount() + " " + request.getCurrency());
+        // successfully claimed the key
+        try {
+            // Simulate processing work
+            //Todo: we should remove this in production
+            Thread.sleep(100);
+            ResponseEntity<String> response = ResponseEntity.ok("Charged " + request.getAmount() + " " + request.getCurrency());
 
-        IdempotencyRecord record = IdempotencyRecord.builder()
-                .status(IdempotencyRecord.Status.COMPLETED)
-                .requestPayload(request)
-                .response(response)
-                .build();
+            // Update record status and complete the future so waiting threads can proceed
+            newRecord.setStatus(IdempotencyRecord.Status.COMPLETED);
+            newRecord.setResponse(response);
+            newRecord.getCompletionFuture().complete(response);
 
-        cache.put(idempotencyKey, record);
-
-        return response;
+            return response;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            cache.remove(idempotencyKey);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Request processing interrupted.");
+        }
     }
 
     private boolean isPayloadMatching(PaymentRequest cached, PaymentRequest incoming) {
         if (cached == null || incoming == null) return false;
         return cached.getAmount() == incoming.getAmount()
                 && Objects.equals(cached.getCurrency(), incoming.getCurrency());
+    }
+
+    private ResponseEntity<String> attachCacheHitHeader(ResponseEntity<String> cachedResponse) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.putAll(cachedResponse.getHeaders());
+        headers.add("X-Cache-Hit", "true");
+
+        return new ResponseEntity<>(
+                cachedResponse.getBody(),
+                headers,
+                cachedResponse.getStatusCode()
+        );
     }
 }

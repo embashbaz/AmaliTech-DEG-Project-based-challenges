@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.http.ResponseEntity;
 
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
 
 @Data
 @NoArgsConstructor
@@ -22,6 +23,10 @@ public class IdempotencyRecord {
     private Status status;
     private PaymentRequest requestPayload;
     private ResponseEntity<String> response;
+
+    @Builder.Default
+    private CompletableFuture<ResponseEntity<String>> completionFuture = new CompletableFuture<>();
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 }

@@ -6,6 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class IdempotencyServiceTest {
@@ -52,5 +56,27 @@ class IdempotencyServiceTest {
 
         assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, secondResponse.getStatusCode());
         assertEquals("Idempotency key already used for a different request body.", secondResponse.getBody());
+    }
+
+    @Test
+    void whenConcurrentRequestsWithSameKey_secondRequestWaitsAndReceivesCachedResponse() throws Exception {
+        String key = "concurrent-key-303";
+        PaymentRequest request = new PaymentRequest(200, "Rwf");
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        // Submit two requests concurrently with the exact same key
+        Future<ResponseEntity<String>> future1 = executor.submit(() -> idempotencyService.process(key, request));
+        Future<ResponseEntity<String>> future2 = executor.submit(() -> idempotencyService.process(key, request));
+
+        ResponseEntity<String> response1 = future1.get();
+        ResponseEntity<String> response2 = future2.get();
+
+        assertEquals(HttpStatus.OK, response1.getStatusCode());
+        assertEquals(HttpStatus.OK, response2.getStatusCode());
+        assertEquals("Charged 200 Rwf", response1.getBody());
+        assertEquals("Charged 200 Rwf", response2.getBody());
+
+        executor.shutdown();
     }
 }

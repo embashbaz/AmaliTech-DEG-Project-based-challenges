@@ -21,7 +21,7 @@ public class IdempotencyRecord {
 
     private Status status;
     private PaymentRequest requestPayload;
-    private ResponseEntity response;
+    private ResponseEntity<String> response;
     @Builder.Default
     private Instant createdAt = Instant.now();
 }

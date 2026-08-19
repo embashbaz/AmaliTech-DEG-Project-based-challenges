@@ -18,7 +18,6 @@ public class PaymentController {
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestBody PaymentRequest request) {
 
-        // Delegate the heavy lifting to the service
         return idempotencyService.process(idempotencyKey, request);
     }
 }

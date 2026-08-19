@@ -5,19 +5,32 @@ import com.example.solution.model.PaymentRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class IdempotencyService {
 
-    private final Map<String, IdempotencyRecord> cache = new ConcurrentHashMap<>();
+    // this should be private but is public right now because one of the test access it
+    final Map<String, IdempotencyRecord> cache = new ConcurrentHashMap<>();
+    private static final long TTL_HOURS = 2;
 
     public ResponseEntity<String> process(String idempotencyKey, PaymentRequest request) {
+        cache.computeIfPresent(idempotencyKey, (key, record) -> {
+            if (isExpired(record)) {
+                return null; // Removes the entry from the map
+            }
+            return record;
+        });
+
         IdempotencyRecord newRecord = IdempotencyRecord.builder()
                 .status(IdempotencyRecord.Status.IN_FLIGHT)
                 .requestPayload(request)
@@ -84,5 +97,15 @@ public class IdempotencyService {
                 headers,
                 cachedResponse.getStatusCode()
         );
+    }
+
+    // Background job running every 5 hour to clean up old keys
+    @Scheduled(fixedRate = 5, timeUnit = TimeUnit.HOURS)
+    public void evictExpiredEntries() {
+        cache.entrySet().removeIf(entry -> isExpired(entry.getValue()));
+    }
+
+    private boolean isExpired(IdempotencyRecord record) {
+        return record.getCreatedAt().plus(TTL_HOURS, ChronoUnit.HOURS).isBefore(Instant.now());
     }
 }

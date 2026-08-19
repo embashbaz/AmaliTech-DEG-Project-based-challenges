@@ -1,11 +1,14 @@
 package com.example.solution.service;
 
+import com.example.solution.model.IdempotencyRecord;
 import com.example.solution.model.PaymentRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -78,5 +81,29 @@ class IdempotencyServiceTest {
         assertEquals("Charged 200 Rwf", response2.getBody());
 
         executor.shutdown();
+    }
+
+    @Test
+    void whenRecordIsOlderThanTwoHours_itIsEvictedAndProcessedFresh() {
+        String key = "expired-key-404";
+        PaymentRequest request = new PaymentRequest(300, "Rwf");
+
+        // we put an expired record into the cache
+        IdempotencyRecord expiredRecord = IdempotencyRecord.builder()
+                .status(IdempotencyRecord.Status.COMPLETED)
+                .requestPayload(request)
+                .response(ResponseEntity.ok("Stale Response"))
+                .createdAt(Instant.now().minus(3, ChronoUnit.HOURS))
+                .build();
+
+        idempotencyService.cache.put(key, expiredRecord);
+
+        // it should be processed fresh instead of a slate response
+        ResponseEntity<String> response = idempotencyService.process(key, request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Charged 300 Rwf", response.getBody());
+        // should not get a slate response
+        assertNull(response.getHeaders().getFirst("X-Cache-Hit"));
     }
 }

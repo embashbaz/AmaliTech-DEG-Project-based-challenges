@@ -37,9 +37,4 @@ public class RateLimiterService {
             return false;
         }
     }
-
-    // Add this method to clear state between tests
-    public void reset() {
-        clientRequests.clear();
-    }
 }

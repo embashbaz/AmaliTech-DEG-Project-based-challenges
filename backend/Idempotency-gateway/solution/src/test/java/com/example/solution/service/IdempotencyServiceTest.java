@@ -40,7 +40,7 @@ class IdempotencyServiceTest {
         ResponseEntity<String> secondResponse = idempotencyService.process(key, request);
         assertEquals(HttpStatus.OK, secondResponse.getStatusCode());
         assertEquals("Charged 100 Rwf", secondResponse.getBody());
-        // Verify X-Cache-Hit header IS present and set to "true"
+        // Verify X-Cache-Hit header is present and set to "true"
         assertEquals("true", secondResponse.getHeaders().getFirst("X-Cache-Hit"));
     }
 

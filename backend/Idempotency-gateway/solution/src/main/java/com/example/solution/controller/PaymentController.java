@@ -19,14 +19,13 @@ public class PaymentController {
     @PostMapping
     public ResponseEntity<String> processPayment(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            // Make header optional with a default value so existing tests pass
             @RequestHeader(value = "X-Client-Id", defaultValue = "default-client") String clientId,
             @RequestBody PaymentRequest request) {
 
         // Rate limit check
         if (!rateLimiterService.tryConsume(clientId)) {
             return ResponseEntity
-                    .<String>status(HttpStatus.TOO_MANY_REQUESTS)
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
                     .body("Rate limit exceeded. Please try again later.");
         }
 

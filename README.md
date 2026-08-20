@@ -3,10 +3,10 @@
 
 ## Solution
 
-The solution is in the [backend/idempotency-gateway/solution](./backend/idempotency-gateway/solution) folder.
+The solution is in the [backend/Idempotency-gateway/solution](backend/Idempotency-gateway/solution) folder.
 
-There is a [README file](./backend/idempotency-gateway/solution/README.md)
- file and the [postman documentation](./backend/idempotency-gateway/solution/payment-api.postman_collection.json)
+There is a [README file](backend/Idempotency-gateway/solution/README.md) and the [postman documentation](backend/Idempotency-gateway/solution/payment-api.postman_collection.json)
+
 
 
 This repository contains the DEG training project challenges across multiple tracks:

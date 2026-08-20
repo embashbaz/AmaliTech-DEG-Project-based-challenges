@@ -1,5 +1,15 @@
 # DEG Project Challenges
 
+
+## Solution
+
+the solution is in the [backend/idempotency-gateway/solution](backend/idempotency-gateway/solution) folder.
+
+There is a a  [README](backend/idempotency-gateway/solution/README.md) file and the [postman documentation](backend/idempotency-gateway/solution/payment-api.postman_collection.json)
+
+
+
+
 This repository contains the DEG training project challenges across multiple tracks:
 
 - Backend

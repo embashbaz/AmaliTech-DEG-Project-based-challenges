@@ -6,7 +6,8 @@ A simple and reliable Spring Boot payment gateway service. I built this using Te
 
 ## Architecture
 
-![Payment Gateway Architecture Diagram](/assets/architecture-diagram.png)
+![Architecture diagram](./assets/architecture-diagram.png)
+
 *Architecture diagram*
 
 ---
